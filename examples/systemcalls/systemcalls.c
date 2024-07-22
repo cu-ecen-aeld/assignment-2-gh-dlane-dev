@@ -1,4 +1,11 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <string.h>
+
 
 /**
  * @param cmd the command to execute with system()
@@ -16,8 +23,17 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+    int result = system(cmd);
+    bool ret = false;
 
-    return true;
+    if (WIFEXITED(result)) {
+    	printf("Signal received\n");
+    	ret = true;
+    } else if (result == -1)  {
+        printf("System error, errno %s\n", strerror(errno));
+    }
+
+    return ret;
 }
 
 /**
@@ -40,6 +56,10 @@ bool do_exec(int count, ...)
     va_start(args, count);
     char * command[count+1];
     int i;
+    pid_t pid;
+    bool ret = false;
+    int status;
+
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
@@ -47,7 +67,7 @@ bool do_exec(int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    //command[count] = command[count];
 
 /*
  * TODO:
@@ -58,10 +78,32 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
-
     va_end(args);
 
-    return true;
+    if (command[0][0] == '/') {
+        pid = fork();
+        
+        switch (pid) {
+        
+        case 0:
+            printf("In child process\n");
+            if (execv(command[0], command) == -1)
+  	    	exit(EXIT_FAILURE);
+            break;
+        case -1:
+            printf("fork error %s\n", strerror(errno));
+            break;
+        default:
+            printf("In parent process\n"); 
+            if (wait(&status) == pid) {
+		if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+		    ret = true;
+	    }
+        }
+    }
+
+
+    return ret;
 }
 
 /**
@@ -75,6 +117,11 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     va_start(args, count);
     char * command[count+1];
     int i;
+    int kidpid;
+    int fd;
+    int ret =false;
+    int status;
+
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
@@ -92,8 +139,25 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+    if (fd >= 0) {
+        switch (kidpid = fork()) {
+            case -1: perror("fork"); abort();
+            case 0:
+                if (dup2(fd, 1) < 0) { perror("dup2"); abort(); }
+                close(fd);
+                if (execvp(command[0], command) >= 0)
+                    ret = true;
 
+            default:
+                close(fd);
+
+                if (wait(&status) >= 0)
+                    ret = true;
+                /* do whatever the parent wants to do. */
+        }
+    }
     va_end(args);
 
-    return true;
+    return ret;
 }
