@@ -41,12 +41,13 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     
     make -j4 ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- all
   
-    make -j4 ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- modules
+    #make -j4 ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- modules
 
     make -j4 ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- dtbs
 fi
 
 echo "Adding the Image in outdir"
+cp ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ${OUTDIR}
 
 echo "Creating the staging directory for the root filesystem"
 cd "$OUTDIR"
@@ -81,9 +82,7 @@ fi
 
 
 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}  
-make CONFIG_PREFIX="${OUTDIR}/rootfs" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
-
-cp ./busybox "${OUTDIR}/rootfs/bin"
+make CONFIG_PREFIX="${OUTDIR}/rootfs" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} install
 
 echo "Library dependencies"
 
@@ -114,11 +113,13 @@ make CROSS_COMPILE=${CROSS_COMPILE} writer
 cp ./writer "${OUTDIR}/rootfs/home"
 cp ./finder.sh "${OUTDIR}/rootfs/home"
 cp ./finder-test.sh "${OUTDIR}/rootfs/home"
+cp ./autorun-qemu.sh "${OUTDIR}/rootfs/home"
 cp ../conf/username.txt "${OUTDIR}/rootfs/home"
 cp ../conf/assignment.txt "${OUTDIR}/rootfs/home"
 
+
 # TODO: Chown the root directory
-sudo chown root:root "${OUTDIR}/rootfs"
+sudo chown -R root:root "${OUTDIR}/rootfs/"
 
 # TODO: Create initramfs.cpio.gz
 cd "${OUTDIR}/rootfs"
